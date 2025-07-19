@@ -1,0 +1,661 @@
+{
+  "type": "compound",
+  "name": "",
+  "value": {
+    "format_version": {
+      "type": "int",
+      "value": 1
+    },
+    "size": {
+      "type": "list",
+      "value": {
+        "type": "int",
+        "value": [
+          5,
+          5,
+          5
+        ]
+      }
+    },
+    "structure": {
+      "type": "compound",
+      "value": {
+        "block_indices": {
+          "type": "list",
+          "value": {
+            "type": "list",
+            "value": [
+              {
+                "type": "int",
+                "value": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  2,
+                  3,
+                  3,
+                  4,
+                  5,
+                  5,
+                  5,
+                  5,
+                  5,
+                  6,
+                  5,
+                  5,
+                  5,
+                  5,
+                  6,
+                  5,
+                  5,
+                  5,
+                  5,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  4,
+                  5,
+                  3,
+                  5,
+                  3,
+                  5,
+                  6,
+                  5,
+                  5,
+                  5,
+                  5,
+                  6,
+                  5,
+                  5,
+                  5,
+                  5,
+                  6,
+                  7,
+                  5,
+                  5,
+                  0,
+                  0,
+                  0,
+                  8,
+                  0,
+                  3,
+                  5,
+                  7,
+                  9,
+                  3,
+                  5,
+                  5,
+                  7,
+                  9,
+                  5,
+                  5,
+                  5,
+                  7,
+                  9,
+                  5,
+                  5,
+                  5,
+                  7,
+                  9,
+                  10,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  3,
+                  5,
+                  5,
+                  3,
+                  11,
+                  5,
+                  5,
+                  5,
+                  11,
+                  11,
+                  5,
+                  5,
+                  5,
+                  11,
+                  11,
+                  5,
+                  5,
+                  5,
+                  11,
+                  11,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  3,
+                  5,
+                  3,
+                  3,
+                  5,
+                  5,
+                  5,
+                  5,
+                  5,
+                  10,
+                  5,
+                  5,
+                  10,
+                  10,
+                  10,
+                  5,
+                  5,
+                  10,
+                  10,
+                  10
+                ]
+              },
+              {
+                "type": "int",
+                "value": [
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1,
+                  -1
+                ]
+              }
+            ]
+          }
+        },
+        "entities": {
+          "type": "list",
+          "value": {
+            "type": "end",
+            "value": []
+          }
+        },
+        "palette": {
+          "type": "compound",
+          "value": {
+            "default": {
+              "type": "compound",
+              "value": {
+                "block_palette": {
+                  "type": "list",
+                  "value": {
+                    "type": "compound",
+                    "value": [
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:grass_block"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {}
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:structure_block"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {
+                            "structure_block_type": {
+                              "type": "string",
+                              "value": "save"
+                            }
+                          }
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:melon_block"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {}
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:short_grass"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {}
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:fern"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {}
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:air"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {}
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:vine"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {
+                            "vine_direction_bits": {
+                              "type": "int",
+                              "value": 2
+                            }
+                          }
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:vine"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {
+                            "vine_direction_bits": {
+                              "type": "int",
+                              "value": 1
+                            }
+                          }
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:dirt"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {}
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:oak_log"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {
+                            "pillar_axis": {
+                              "type": "string",
+                              "value": "y"
+                            }
+                          }
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:oak_leaves"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {
+                            "persistent_bit": {
+                              "type": "byte",
+                              "value": 0
+                            },
+                            "update_bit": {
+                              "type": "byte",
+                              "value": 0
+                            }
+                          }
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      },
+                      {
+                        "name": {
+                          "type": "string",
+                          "value": "minecraft:vine"
+                        },
+                        "states": {
+                          "type": "compound",
+                          "value": {
+                            "vine_direction_bits": {
+                              "type": "int",
+                              "value": 8
+                            }
+                          }
+                        },
+                        "version": {
+                          "type": "int",
+                          "value": 18168865
+                        }
+                      }
+                    ]
+                  }
+                },
+                "block_position_data": {
+                  "type": "compound",
+                  "value": {
+                    "5": {
+                      "type": "compound",
+                      "value": {
+                        "block_entity_data": {
+                          "type": "compound",
+                          "value": {
+                            "animationMode": {
+                              "type": "byte",
+                              "value": 0
+                            },
+                            "animationSeconds": {
+                              "type": "float",
+                              "value": 0
+                            },
+                            "data": {
+                              "type": "int",
+                              "value": 1
+                            },
+                            "dataField": {
+                              "type": "string",
+                              "value": ""
+                            },
+                            "id": {
+                              "type": "string",
+                              "value": "StructureBlock"
+                            },
+                            "ignoreEntities": {
+                              "type": "byte",
+                              "value": 0
+                            },
+                            "includePlayers": {
+                              "type": "byte",
+                              "value": 0
+                            },
+                            "integrity": {
+                              "type": "float",
+                              "value": 100
+                            },
+                            "isMovable": {
+                              "type": "byte",
+                              "value": 1
+                            },
+                            "isPowered": {
+                              "type": "byte",
+                              "value": 0
+                            },
+                            "lastTouchedPlayerId": {
+                              "type": "long",
+                              "value": [
+                                -1,
+                                1
+                              ]
+                            },
+                            "mirror": {
+                              "type": "byte",
+                              "value": 0
+                            },
+                            "redstoneSaveMode": {
+                              "type": "int",
+                              "value": 1
+                            },
+                            "removeBlocks": {
+                              "type": "byte",
+                              "value": 0
+                            },
+                            "rotation": {
+                              "type": "byte",
+                              "value": 0
+                            },
+                            "seed": {
+                              "type": "long",
+                              "value": [
+                                0,
+                                0
+                              ]
+                            },
+                            "showBoundingBox": {
+                              "type": "byte",
+                              "value": 1
+                            },
+                            "structureName": {
+                              "type": "string",
+                              "value": "mystructure:bedrock"
+                            },
+                            "x": {
+                              "type": "int",
+                              "value": 16
+                            },
+                            "xStructureOffset": {
+                              "type": "int",
+                              "value": 0
+                            },
+                            "xStructureSize": {
+                              "type": "int",
+                              "value": 5
+                            },
+                            "y": {
+                              "type": "int",
+                              "value": 65
+                            },
+                            "yStructureOffset": {
+                              "type": "int",
+                              "value": -1
+                            },
+                            "yStructureSize": {
+                              "type": "int",
+                              "value": 5
+                            },
+                            "z": {
+                              "type": "int",
+                              "value": -72
+                            },
+                            "zStructureOffset": {
+                              "type": "int",
+                              "value": 0
+                            },
+                            "zStructureSize": {
+                              "type": "int",
+                              "value": 5
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "structure_world_origin": {
+      "type": "list",
+      "value": {
+        "type": "int",
+        "value": [
+          16,
+          64,
+          -72
+        ]
+      }
+    }
+  }
+}

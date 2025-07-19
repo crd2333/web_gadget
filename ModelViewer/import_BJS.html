@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Babylon.js Demo</title>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+  <canvas id="renderCanvas" style="width: 800px; height: 600px;"></canvas>
+  <input type="file" id="modelInput" accept=".obj,.gltf,.glb,.babylon" style="margin-top:10px;" />
+  <script type="module">
+    const canvas = document.getElementById("renderCanvas"); // 画布，html 网页的元素
+    const engine = new BABYLON.Engine(canvas, true);        // 引擎，BJS 的核心，负责渲染和管理场景
+
+    const createScene = async function () {
+        const scene = new BABYLON.Scene(engine);                                 // scene 是 BJS 乃至各类 3D 引擎的核心渲染单位
+        const camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0, 5, -10), scene); // freeCamera 可以方向键控制
+        camera.setTarget(BABYLON.Vector3.Zero());                                                // 相机看向场景原点
+        camera.attachControl(canvas, true);                                            // 绑定相机到 canvas 上，鼠标控制相机移动
+        const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene); // 半球光源，指向 (0, 1, 0)
+        light.intensity = 0.7;                                                                    // 光照强度 (0 ~ 1)
+
+        try {
+            // const meshes = container.meshes;
+            // if (meshes && meshes.length > 0) {
+            //     // Merge all meshes in the container, disposing of the original meshes
+            //     const mergedMesh = BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, true);
+            //     if (mergedMesh) {
+            //         console.log("Model loaded and merged successfully!");
+            //         // Optional: Position the merged mesh if needed, or adjust camera
+            //         // mergedMesh.position.y = 0; // Example: place the model at the origin
+            //     } else {
+            //         console.error("Failed to merge meshes.");
+            //     }
+            // } else {
+            //     console.error("No meshes found in the loaded model.");
+            // }
+        } catch (error) {
+            console.error("Error loading model:", error);
+        }
+
+        return scene;
+    };
+
+    const scene = await createScene();
+
+    const modelInput = document.getElementById('modelInput');
+    modelInput.addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            await BABYLON.AppendSceneAsync(arrayBuffer, scene);
+            console.log("Model loaded successfully!");
+        } catch (error) {
+            console.error("Error loading model:", error);
+        }
+    });
+
+    engine.runRenderLoop(function () {
+      scene.render();
+    });
+  </script>
+</body>
+</html>
+

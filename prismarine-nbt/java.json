@@ -1,0 +1,521 @@
+{
+  "type": "compound",
+  "name": "",
+  "value": {
+    "size": {
+      "type": "list",
+      "value": {
+        "type": "int",
+        "value": [
+          3,
+          3,
+          3
+        ]
+      }
+    },
+    "entities": {
+      "type": "list",
+      "value": {
+        "type": "end",
+        "value": []
+      }
+    },
+    "blocks": {
+      "type": "list",
+      "value": {
+        "type": "compound",
+        "value": [
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  1,
+                  0,
+                  1
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 0
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  0,
+                  1,
+                  1
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 0
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  1,
+                  1,
+                  0
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 0
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 1
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  1,
+                  1,
+                  2
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 0
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  2,
+                  1,
+                  1
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 0
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  1,
+                  2,
+                  1
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 0
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  0,
+                  0,
+                  1
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  0,
+                  0,
+                  2
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  1,
+                  0,
+                  0
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  1,
+                  0,
+                  2
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  2,
+                  0,
+                  0
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  2,
+                  0,
+                  1
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  2,
+                  0,
+                  2
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  0,
+                  1,
+                  0
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  0,
+                  1,
+                  2
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  2,
+                  1,
+                  0
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  2,
+                  1,
+                  2
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  0,
+                  2,
+                  0
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  0,
+                  2,
+                  1
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  0,
+                  2,
+                  2
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  1,
+                  2,
+                  0
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  1,
+                  2,
+                  2
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  2,
+                  2,
+                  0
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  2,
+                  2,
+                  1
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          },
+          {
+            "pos": {
+              "type": "list",
+              "value": {
+                "type": "int",
+                "value": [
+                  2,
+                  2,
+                  2
+                ]
+              }
+            },
+            "state": {
+              "type": "int",
+              "value": 2
+            }
+          }
+        ]
+      }
+    },
+    "palette": {
+      "type": "list",
+      "value": {
+        "type": "compound",
+        "value": [
+          {
+            "Name": {
+              "type": "string",
+              "value": "minecraft:polished_deepslate"
+            }
+          },
+          {
+            "Name": {
+              "type": "string",
+              "value": "minecraft:redstone_block"
+            }
+          },
+          {
+            "Name": {
+              "type": "string",
+              "value": "minecraft:air"
+            }
+          }
+        ]
+      }
+    },
+    "DataVersion": {
+      "type": "int",
+      "value": 2975
+    }
+  }
+}

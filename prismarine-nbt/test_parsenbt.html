@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prismarine NBT 浏览器测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .container {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        
+        .upload-area:hover {
+            border-color: #007acc;
+        }
+        
+        .upload-area.dragover {
+            border-color: #007acc;
+            background-color: #f0f8ff;
+        }
+        
+        #output {
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #005999;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .error {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .success {
+            color: #388e3c;
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Prismarine NBT 浏览器测试</h1>
+    
+    <div class="container">
+        <h2>文件上传</h2>
+        <div class="upload-area" id="uploadArea">
+            <p>点击这里或拖拽 .mcstructure / .nbt 文件到此处</p>
+            <input type="file" id="fileInput" accept=".mcstructure,.nbt" style="display: none;">
+        </div>
+        
+        <div>
+            <button id="parseBtn" disabled>解析 NBT 文件</button>
+            <button id="downloadBtn" disabled>下载 JSON</button>
+            <button id="clearBtn">清空输出</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>输出结果</h2>
+        <div id="messages"></div>
+        <pre id="output"></pre>
+    </div>
+
+    <!-- 使用模块化导入 -->
+    <script type="module">
+        // 导入 prismarine-nbt 库
+        import { parse as parseNBT, Buffer } from "./dist/prismarine-nbt.min.js";
+        
+        // 全局变量
+        let selectedFile = null;
+        let parsedData = null;
+        
+        // DOM 元素
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const parseBtn = document.getElementById('parseBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const output = document.getElementById('output');
+        const messages = document.getElementById('messages');
+        
+        // 显示消息
+        function showMessage(message, type = 'info') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            messages.appendChild(messageDiv);
+            
+            // 5秒后自动移除消息
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+        
+        // 清空输出
+        function clearOutput() {
+            output.textContent = '';
+            messages.innerHTML = '';
+            parsedData = null;
+            downloadBtn.disabled = true;
+        }
+        
+        // 文件选择处理
+        function handleFileSelect(file) {
+            if (!file) return;
+            
+            selectedFile = file;
+            parseBtn.disabled = false;
+            showMessage(`已选择文件: ${file.name}`, 'success');
+        }
+        
+        // 解析NBT文件
+        async function parseNBTFile() {
+            if (!selectedFile) {
+                showMessage('请先选择一个文件', 'error');
+                return;
+            }
+            
+            try {
+                showMessage('正在解析NBT文件...', 'info');
+                
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    try {
+                        const arrayBuffer = reader.result;
+                        const buffer = Buffer.from(arrayBuffer);
+                        console.log(buffer);
+                        const { parsed, type } = await parseNBT(buffer);
+                        
+                        parsedData = parsed;
+                        const jsonStr = JSON.stringify(parsed, null, 2);
+                        
+                        output.textContent = jsonStr;
+                        
+                        showMessage(`解析成功! 类型: ${type}`, 'success');
+                        downloadBtn.disabled = false;
+                        
+                    } catch (e) {
+                        showMessage('解析失败: ' + e.message, 'error');
+                        console.error('解析错误:', e);
+                        output.textContent = '解析失败: ' + e.message;
+                    }
+                };
+                
+                reader.onerror = () => {
+                    showMessage('文件读取失败', 'error');
+                };
+                
+                reader.readAsArrayBuffer(selectedFile);
+                
+            } catch (error) {
+                showMessage('发生错误: ' + error.message, 'error');
+                console.error('错误:', error);
+            }
+        }
+        
+        // 下载JSON文件
+        function downloadJSON() {
+            if (!parsedData) {
+                showMessage('没有可下载的数据', 'error');
+                return;
+            }
+            
+            const jsonStr = JSON.stringify(parsedData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'output.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showMessage('JSON文件已下载', 'success');
+        }
+        
+        // 事件监听器
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            handleFileSelect(e.target.files[0]);
+        });
+        
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+        
+        parseBtn.addEventListener('click', parseNBTFile);
+        downloadBtn.addEventListener('click', downloadJSON);
+        clearBtn.addEventListener('click', clearOutput);
+        
+        // 初始化
+        showMessage('请选择一个 .mcstructure 文件开始测试', 'info');
+        
+    </script>
+</body>
+</html>

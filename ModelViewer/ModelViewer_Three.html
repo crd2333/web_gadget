@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模型查看器</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        button {
+            margin: 5px;
+            padding: 8px 12px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #555;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            display: none; /* Initially hide loading text */
+        }
+
+        #pointInfo {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            display: none;
+            max-width: 350px;
+            z-index: 99999;
+            border: 2px solid #333;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">正在加载模型...</div>
+
+    <div id="info">
+        <div>模型查看器</br>(based on Three.js)</br>Mainly built by AI</div>
+        <div>鼠标中键：平移</div>
+        <div>鼠标右键：旋转</div>
+        <div>滚轮：缩放</div>
+    </div>
+
+    <div id="pointInfo">
+        <strong>点云信息面板</strong><br>
+        点击点云查询坐标和颜色信息
+    </div>
+
+    <div id="controls">
+        <button onclick="document.getElementById('modelInput').click()">选择模型文件</button>
+        <button onclick="resetCamera()">重置视角</button>
+        <button onclick="setVisualizationMode(0)" id="normalMode">正常模式</button>
+        <button onclick="setVisualizationMode(1)" id="wireframeMode">线框模式</button>
+        <button onclick="setVisualizationMode(2)" id="pointCloudMode">点云模式</button>
+        <button onclick="toggleInfoMode()">点云查询</button>
+        <button onclick="toggleAxesHelper()" id="axesButton">显示坐标轴</button>
+    </div>
+
+    <input type="file" id="modelInput" accept=".obj,.glb,.stl,.mtl,image/*" multiple style="display: none;">
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.177.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.177.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+        import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+        import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; // Import GLTFLoader
+
+        // 基本设置
+        let scene, camera, renderer, controls;
+        let loadedModel = null;
+
+        let visualizationMode = 0; // 0: 正常, 1: 线框, 2: 点云
+        let isLODEnabled = false;
+
+        // 点云管理
+        let pointClouds = []; // 独立管理点云对象，避免影响原模型结构
+        let pointCloudsBuilt = false; // 标记点云是否已经构建
+
+        // 点云查询相关
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let isInfoMode = false; // 是否开启信息查询模式
+        let highlightPoint = null;
+
+        // 坐标轴相关
+        let axesHelper = null;
+        let isAxesVisible = false;
+
+        // 初始化
+        init();
+        animate();
+
+        function init() {
+            // 创建场景
+            scene = new THREE.Scene();
+            // Change background color to light blue
+            scene.background = new THREE.Color(0xadd8e6); // Light blue color
+
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(5, 5, 5);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            // 禁用色调映射以确保颜色准确
+            renderer.toneMapping = THREE.NoToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            
+            document.body.appendChild(renderer.domElement);
+
+            // 创建控制器
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.mouseButtons = {
+                LEFT: THREE.MOUSE.NONE,    // 左键无响应
+                MIDDLE: THREE.MOUSE.PAN,   // 中键平移
+                RIGHT: THREE.MOUSE.ROTATE  // 右键旋转
+            };
+
+            // 添加光照
+            setupLighting();
+
+            // 初始化射线投射器
+            raycaster.params.Points.threshold = 1.0; // 增加点云检测的初始阈值
+
+            // 添加鼠标点击事件监听
+            renderer.domElement.addEventListener('click', onMouseClick, false);
+
+            // 窗口大小调整
+            window.addEventListener('resize', onWindowResize);
+
+            // Add event listener for file input
+            const modelInput = document.getElementById('modelInput');
+            modelInput.addEventListener('change', handleFileSelect);
+
+            // Hide initial loading text (already done in CSS, but good to be explicit)
+            document.getElementById('loading').style.display = 'none';
+            
+            // 初始化可视化模式按钮状态
+            updateVisualizationButtons();
+        }
+
+        function setupLighting() {
+            // 环境光 - 增加亮度和改善颜色
+            const ambientLight = new THREE.AmbientLight(0x808080, 1.8);
+            scene.add(ambientLight);
+
+            // 主光源
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(10, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            // 补充光源
+            const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            light2.position.set(-10, 5, -5);
+            scene.add(light2);
+        }
+
+        function onMouseClick(event) {
+            if (!loadedModel || visualizationMode !== 2 || !isInfoMode) {
+                return;
+            }
+            
+            // 计算鼠标位置
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // 设置更精确的选择阈值
+            const cameraDistance = camera.position.distanceTo(controls.target);
+            
+            // 减小选择阈值，提高选择精度
+            const dynamicThreshold = Math.max(0.1, Math.min(0.8, cameraDistance * 0.005));
+            raycaster.params.Points.threshold = dynamicThreshold;
+            
+            // 设置更小的最大选择距离，避免选中过远的点
+            const maxSelectDistance = cameraDistance * 1.0; // 减小最大选择距离
+            
+            // 更新射线投射器
+            raycaster.setFromCamera(mouse, camera);
+            
+            // 查找所有点云对象（包括多材质产生的多个点云）
+            const pointClouds = [];
+            loadedModel.traverse(function(child) {
+                if (child.userData.pointsHelper) {
+                    pointClouds.push(child.userData.pointsHelper);
+                }
+            });
+            
+            // 查找所有独立的点云对象（多材质情况）
+            loadedModel.traverse(function(child) {
+                if (child.isPoints) {
+                    pointClouds.push(child);
+                }
+            });
+            
+            // 去重（避免重复添加）
+            const uniquePointClouds = [...new Set(pointClouds)];
+            
+            if (uniquePointClouds.length === 0) return;
+            
+            // 检测与点云的交叉
+            const intersects = raycaster.intersectObjects(uniquePointClouds);
+            
+            // 过滤距离过远的交叉点，并按距离排序
+            const validIntersects = intersects
+                .filter(intersect => intersect.distance <= maxSelectDistance)
+                .sort((a, b) => a.distance - b.distance);
+            
+            if (validIntersects.length > 0) {
+                // 查找所有在同一位置的点（来自不同材质的点云）
+                const firstIntersect = validIntersects[0];
+                const selectedPoint = firstIntersect.object;
+                const selectedPointIndex = firstIntersect.index;
+                
+                // 获取选中点的世界坐标
+                const worldPosition = new THREE.Vector3();
+                const geometry = selectedPoint.geometry;
+                const position = geometry.attributes.position;
+                
+                // 获取选中点的本地坐标
+                const localX = position.getX(selectedPointIndex);
+                const localY = position.getY(selectedPointIndex);
+                const localZ = position.getZ(selectedPointIndex);
+                
+                // 转换为世界坐标
+                const localPosition = new THREE.Vector3(localX, localY, localZ);
+                selectedPoint.localToWorld(localPosition);
+                worldPosition.copy(localPosition);
+                
+                // 查找所有在相同位置的点（跨所有点云）
+                const samePositionVertices = [];
+                const tolerance = 0.1; // 世界坐标容差
+                
+                uniquePointClouds.forEach((pointCloud, cloudIndex) => {
+                    const cloudGeometry = pointCloud.geometry;
+                    const cloudPosition = cloudGeometry.attributes.position;
+                    
+                    for (let i = 0; i < cloudPosition.count; i++) {
+                        const x = cloudPosition.getX(i);
+                        const y = cloudPosition.getY(i);
+                        const z = cloudPosition.getZ(i);
+                        
+                        // 转换为世界坐标进行比较
+                        const testPosition = new THREE.Vector3(x, y, z);
+                        pointCloud.localToWorld(testPosition);
+                        
+                        if (testPosition.distanceTo(worldPosition) <= tolerance) {
+                            // 获取颜色信息
+                            let colorInfo = '无颜色信息';
+                            let materialInfo = '';
+                            
+                            // 优先检查顶点颜色（STL模型）
+                            if (cloudGeometry.attributes.color && i < cloudGeometry.attributes.color.count) {
+                                const color = cloudGeometry.attributes.color;
+                                
+                                // 获取原始浮点值
+                                const rawR = color.getX(i);
+                                const rawG = color.getY(i);
+                                const rawB = color.getZ(i);
+                                
+                                // 计算逆伽马校正后的颜色（实际渲染颜色）
+                                const srgbR = Math.pow(rawR, 1.0 / 2.2);
+                                const srgbG = Math.pow(rawG, 1.0 / 2.2);
+                                const srgbB = Math.pow(rawB, 1.0 / 2.2);
+                                const actualR = Math.round(srgbR * 255);
+                                const actualG = Math.round(srgbG * 255);
+                                const actualB = Math.round(srgbB * 255);
+                                
+                                colorInfo = `RGB(${actualR}, ${actualG}, ${actualB})`;
+                                materialInfo = ` (顶点颜色)`;
+                            }
+                            // 检查是否有材质信息（OBJ+MTL模型）
+                            else if (cloudGeometry.userData && cloudGeometry.userData.originalPositionMap && cloudGeometry.userData.originalPositionMap[i]) {
+                                const mapping = cloudGeometry.userData.originalPositionMap[i];
+                                if (mapping.materialInfo && mapping.materialInfo.color) {
+                                    const matColor = mapping.materialInfo.color;
+                                    const r = Math.round(matColor.r * 255);
+                                    const g = Math.round(matColor.g * 255);
+                                    const b = Math.round(matColor.b * 255);
+                                    colorInfo = `RGB(${r}, ${g}, ${b})`;
+                                    materialInfo = ` (材质颜色)`;
+                                }
+                            } 
+                            // 使用点云材质颜色
+                            else if (pointCloud.material.color) {
+                                const matColor = pointCloud.material.color;
+                                const r = Math.round(matColor.r * 255);
+                                const g = Math.round(matColor.g * 255);
+                                const b = Math.round(matColor.b * 255);
+                                colorInfo = `RGB(${r}, ${g}, ${b})`;
+                                materialInfo = ` (点云材质)`;
+                            } else {
+                                // 使用实际渲染颜色计算方法
+                                const actualColor = getActualPointColor(pointCloud, i);
+                                colorInfo = actualColor.rgb;
+                                materialInfo = ` (${actualColor.source})`;
+                            }
+                            
+                            samePositionVertices.push({
+                                index: i, x: x, y: y, z: z,
+                                color: colorInfo + materialInfo,
+                                cloudIndex: cloudIndex,
+                                pointCloud: pointCloud
+                            });
+                        }
+                    }
+                });
+                
+                // 显示所有相同位置的顶点信息
+                showMultiplePointsInfo(samePositionVertices, firstIntersect.distance);
+                
+                // 高亮显示选中的点（使用世界坐标）
+                highlightSelectedPointAtWorldPosition(worldPosition);
+            }
+        }
+
+        // 使用世界坐标高亮选中的点
+        function highlightSelectedPointAtWorldPosition(worldPosition) {
+            // 清除之前的高亮
+            if (highlightPoint) {
+                scene.remove(highlightPoint);
+                highlightPoint = null;
+            }
+            
+            // 使用固定的小球体大小，接近点云大小
+            const highlightSize = 0.04;
+            
+            const highlightGeometry = new THREE.SphereGeometry(highlightSize);
+            const highlightMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xff0000,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            highlightPoint = new THREE.Mesh(highlightGeometry, highlightMaterial);
+            highlightPoint.position.copy(worldPosition);
+            
+            scene.add(highlightPoint);
+        }
+
+        // 获取点云实际渲染的颜色信息
+        function getActualPointColor(pointCloud, pointIndex) {
+            const geometry = pointCloud.geometry;
+            const material = pointCloud.material;
+            
+            // 如果点云材质启用了顶点颜色并且几何体有颜色属性
+            if (material.vertexColors && geometry.attributes.color && pointIndex < geometry.attributes.color.count) {
+                const color = geometry.attributes.color;
+                
+                // 获取原始浮点值
+                const rawR = color.getX(pointIndex);
+                const rawG = color.getY(pointIndex);
+                const rawB = color.getZ(pointIndex);
+                
+                // 计算逆伽马校正后的颜色（更接近实际渲染效果）
+                const srgbR = Math.pow(rawR, 1.0 / 2.2);
+                const srgbG = Math.pow(rawG, 1.0 / 2.2);
+                const srgbB = Math.pow(rawB, 1.0 / 2.2);
+                const actualR = Math.round(srgbR * 255);
+                const actualG = Math.round(srgbG * 255);
+                const actualB = Math.round(srgbB * 255);
+                
+                // 原始几何体颜色（数据颜色）
+                const dataR = Math.round(rawR * 255);
+                const dataG = Math.round(rawG * 255);
+                const dataB = Math.round(rawB * 255);
+                
+                return {
+                    rgb: `RGB(${actualR}, ${actualG}, ${actualB})`,
+                    hex: `#${actualR.toString(16).padStart(2, '0')}${actualG.toString(16).padStart(2, '0')}${actualB.toString(16).padStart(2, '0')}`,
+                    source: '顶点颜色(实际渲染)',
+                    dataRgb: `RGB(${dataR}, ${dataG}, ${dataB})`,
+                    dataHex: `#${dataR.toString(16).padStart(2, '0')}${dataG.toString(16).padStart(2, '0')}${dataB.toString(16).padStart(2, '0')}`
+                };
+            }
+            // 否则使用材质颜色
+            else if (material.color) {
+                const matColor = material.color;
+                const r = Math.round(matColor.r * 255);
+                const g = Math.round(matColor.g * 255);
+                const b = Math.round(matColor.b * 255);
+                
+                return {
+                    rgb: `RGB(${r}, ${g}, ${b})`,
+                    hex: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`,
+                    source: '材质颜色'
+                };
+            }
+            
+            return {
+                rgb: '无颜色信息',
+                hex: '#888888',
+                source: '默认'
+            };
+        }
+
+        function showMultiplePointsInfo(vertices, distance) {
+            const infoPanel = document.getElementById('pointInfo');
+            
+            if (!infoPanel) {
+                return;
+            }
+            
+            // 提取RGB值的辅助函数
+            function extractRGBFromColorString(colorString) {
+                // 匹配 RGB(r, g, b) 格式
+                const rgbMatch = colorString.match(/RGB\((\d+),\s*(\d+),\s*(\d+)\)/);
+                if (rgbMatch) {
+                    return {
+                        r: parseInt(rgbMatch[1]),
+                        g: parseInt(rgbMatch[2]),
+                        b: parseInt(rgbMatch[3])
+                    };
+                }
+                // 如果没有匹配到，返回灰色
+                return { r: 136, g: 136, b: 136 };
+            }
+            
+            // 创建颜色方块的辅助函数
+            function createColorBox(colorString) {
+                const rgb = extractRGBFromColorString(colorString);
+                const hex = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
+                return `<span style="display: inline-block; width: 16px; height: 16px; background-color: ${hex}; border: 1px solid #666; margin-right: 8px; vertical-align: middle;" title="十六进制: ${hex}"></span>`;
+            }
+            
+            if (vertices.length === 1) {
+                // 只有一个顶点，使用原来的显示方式
+                const vertex = vertices[0];
+                const colorBox = createColorBox(vertex.color);
+                const rgb = extractRGBFromColorString(vertex.color);
+                const hex = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
+                
+                // 如果有实际渲染颜色信息，显示更详细的信息
+                let colorInfo = `颜色: ${colorBox}${vertex.color}<br>十六进制: ${hex}`;
+                
+                // 检查是否是顶点颜色且有附加信息
+                if (vertex.color.includes('(实际渲染)')) {
+                    // 尝试获取更详细的颜色信息
+                    // 这里可以添加更详细的颜色分析
+                }
+                
+                infoPanel.innerHTML = `
+                    <strong>点云信息</strong><br>
+                    索引: ${vertex.index}<br>
+                    坐标: (${vertex.x.toFixed(3)}, ${vertex.y.toFixed(3)}, ${vertex.z.toFixed(3)})<br>
+                    ${colorInfo}<br>
+                    距离相机: ${distance.toFixed(3)}
+                `;
+            } else {
+                // 多个顶点，显示详细列表
+                const firstVertex = vertices[0];
+                let html = `
+                    <strong>重复顶点信息 (${vertices.length}个)</strong><br>
+                    坐标: (${firstVertex.x.toFixed(3)}, ${firstVertex.y.toFixed(3)}, ${firstVertex.z.toFixed(3)})<br>
+                    距离相机: ${distance.toFixed(3)}<br><br>
+                    <strong>所有顶点详情:</strong><br>
+                `;
+                
+                // 按颜色分组显示
+                const colorGroups = {};
+                vertices.forEach(vertex => {
+                    if (!colorGroups[vertex.color]) {
+                        colorGroups[vertex.color] = [];
+                    }
+                    colorGroups[vertex.color].push(vertex.index);
+                });
+                
+                Object.keys(colorGroups).forEach(color => {
+                    const indices = colorGroups[color];
+                    const colorBox = createColorBox(color);
+                    html += `${colorBox}${color}: 索引 [${indices.join(', ')}]<br>`;
+                });
+                
+                infoPanel.innerHTML = html;
+            }
+        }
+
+        // 处理重叠顶点：只为不同颜色的顶点创建微小偏移
+        function handleOverlappingVertices(geometry) {
+            const positions = geometry.attributes.position;
+            const colors = geometry.attributes.color;
+            
+            if (!positions) return geometry;
+            
+            const vertexMap = new Map();
+            const tolerance = 0.001; // 位置容差
+            
+            // 分析所有顶点，按位置分组
+            for (let i = 0; i < positions.count; i++) {
+                const x = positions.getX(i);
+                const y = positions.getY(i);
+                const z = positions.getZ(i);
+                
+                // 创建位置键（考虑容差）
+                const key = `${Math.round(x / tolerance) * tolerance}_${Math.round(y / tolerance) * tolerance}_${Math.round(z / tolerance) * tolerance}`;
+                
+                if (!vertexMap.has(key)) {
+                    vertexMap.set(key, []);
+                }
+                
+                const vertexData = {
+                    index: i,
+                    position: [x, y, z],
+                    color: colors ? [colors.getX(i), colors.getY(i), colors.getZ(i)] : null
+                };
+                
+                vertexMap.get(key).push(vertexData);
+            }
+            
+            const newPositions = [];
+            const newColors = [];
+            let hasOverlapping = false;
+            
+            // 处理每个位置组
+            vertexMap.forEach((vertices, key) => {
+                if (vertices.length === 1) {
+                    // 单个顶点，直接添加
+                    const v = vertices[0];
+                    newPositions.push(...v.position);
+                    if (colors && v.color) {
+                        newColors.push(...v.color);
+                    }
+                } else {
+                    // 多个顶点，按颜色分组
+                    const colorGroups = new Map();
+                    
+                    vertices.forEach(v => {
+                        let colorKey = 'no-color';
+                        if (colors && v.color) {
+                            // 创建颜色键，考虑浮点数精度
+                            colorKey = `${v.color[0].toFixed(3)}_${v.color[1].toFixed(3)}_${v.color[2].toFixed(3)}`;
+                        }
+                        
+                        if (!colorGroups.has(colorKey)) {
+                            colorGroups.set(colorKey, []);
+                        }
+                        colorGroups.get(colorKey).push(v);
+                    });
+                    
+                    if (colorGroups.size === 1) {
+                        // 所有顶点都是同一颜色，不需要偏移
+                        vertices.forEach(v => {
+                            newPositions.push(...v.position);
+                            if (colors && v.color) {
+                                newColors.push(...v.color);
+                            }
+                        });
+                    } else {
+                        // 不同颜色的顶点，需要创建偏移
+                        hasOverlapping = true;
+                        const offsetRadius = 0.03; // 微小偏移半径
+                        
+                        // 按颜色键排序，确保偏移位置的一致性
+                        const sortedColorKeys = Array.from(colorGroups.keys()).sort();
+                        
+                        sortedColorKeys.forEach((colorKey, colorIndex) => {
+                            const colorVertices = colorGroups.get(colorKey);
+                            const angle = (colorIndex / sortedColorKeys.length) * Math.PI * 2;
+                            const offsetX = Math.cos(angle) * offsetRadius;
+                            const offsetY = Math.sin(angle) * offsetRadius;
+                            
+                            colorVertices.forEach(v => {
+                                newPositions.push(
+                                    v.position[0] + offsetX,
+                                    v.position[1] + offsetY,
+                                    v.position[2]
+                                );
+                                
+                                if (colors && v.color) {
+                                    newColors.push(...v.color);
+                                }
+                            });
+                        });
+                    }
+                }
+            });
+            
+            // 如果没有重叠顶点，返回原几何体
+            if (!hasOverlapping) {
+                return geometry;
+            }
+            
+            // 创建新的几何体
+            const newGeometry = new THREE.BufferGeometry();
+            newGeometry.setAttribute('position', new THREE.Float32BufferAttribute(newPositions, 3));
+            
+            if (colors && newColors.length > 0) {
+                newGeometry.setAttribute('color', new THREE.Float32BufferAttribute(newColors, 3));
+            }
+            
+            // 保存原始位置映射信息，用于点击查询
+            newGeometry.userData.originalPositionMap = [];
+            newGeometry.userData.indexToOriginalIndex = []; // 新增：新索引到原始索引的映射
+            let newIndex = 0;
+            vertexMap.forEach((vertices, key) => {
+                const [baseX, baseY, baseZ] = key.split('_').map(parseFloat);
+                
+                if (vertices.length === 1) {
+                    // 单个顶点
+                    newGeometry.userData.originalPositionMap[newIndex] = {
+                        originalPosition: [baseX, baseY, baseZ],
+                        groupVertices: vertices
+                    };
+                    newGeometry.userData.indexToOriginalIndex[newIndex] = vertices[0].index;
+                    newIndex++;
+                } else {
+                    // 多个顶点
+                    const colorGroups = new Map();
+                    vertices.forEach(v => {
+                        let colorKey = 'no-color';
+                        if (colors && v.color) {
+                            colorKey = `${v.color[0].toFixed(3)}_${v.color[1].toFixed(3)}_${v.color[2].toFixed(3)}`;
+                        }
+                        if (!colorGroups.has(colorKey)) {
+                            colorGroups.set(colorKey, []);
+                        }
+                        colorGroups.get(colorKey).push(v);
+                    });
+                    
+                    // 按颜色键排序处理，确保与偏移处理顺序一致
+                    const sortedColorKeys = Array.from(colorGroups.keys()).sort();
+                    sortedColorKeys.forEach(colorKey => {
+                        const colorVertices = colorGroups.get(colorKey);
+                        colorVertices.forEach(v => {
+                            newGeometry.userData.originalPositionMap[newIndex] = {
+                                originalPosition: [baseX, baseY, baseZ],
+                                groupVertices: vertices
+                            };
+                            newGeometry.userData.indexToOriginalIndex[newIndex] = v.index;
+                            newIndex++;
+                        });
+                    });
+                }
+            });
+            
+            // 复制其他属性
+            for (const attributeName in geometry.attributes) {
+                if (attributeName !== 'position' && attributeName !== 'color') {
+                    newGeometry.setAttribute(attributeName, geometry.attributes[attributeName].clone());
+                }
+            }
+            
+            return newGeometry;
+        }
+
+        function highlightSelectedPoint(pointCloud, pointIndex) {
+            // 清除之前的高亮
+            if (highlightPoint) {
+                scene.remove(highlightPoint);
+                highlightPoint = null;
+            }
+            
+            const geometry = pointCloud.geometry;
+            let highlightX, highlightY, highlightZ;
+            
+            // 如果有原始位置映射，使用原始位置
+            if (geometry.userData && geometry.userData.originalPositionMap && geometry.userData.originalPositionMap[pointIndex]) {
+                const mapping = geometry.userData.originalPositionMap[pointIndex];
+                [highlightX, highlightY, highlightZ] = mapping.originalPosition;
+            } else {
+                // 否则使用当前位置
+                const position = geometry.attributes.position;
+                highlightX = position.getX(pointIndex);
+                highlightY = position.getY(pointIndex);
+                highlightZ = position.getZ(pointIndex);
+            }
+            
+            // 使用固定的小球体大小，接近点云大小
+            const highlightSize = 0.04; // 稍微减小高亮点大小，匹配新的点云大小
+            
+            const highlightGeometry = new THREE.SphereGeometry(highlightSize);
+            const highlightMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xff0000,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            highlightPoint = new THREE.Mesh(highlightGeometry, highlightMaterial);
+            
+            // 设置高亮点位置（基于原始位置，不是偏移后的位置）
+            highlightPoint.position.copy(pointCloud.position);
+            highlightPoint.position.add(new THREE.Vector3(highlightX, highlightY, highlightZ));
+            highlightPoint.rotation.copy(pointCloud.rotation);
+            highlightPoint.scale.copy(pointCloud.scale);
+            
+            scene.add(highlightPoint);
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length === 0) {
+                return;
+            }
+
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').innerHTML = '正在加载模型...';
+
+            // Remove previous model
+            if (loadedModel) {
+                scene.remove(loadedModel);
+                // 清理所有点云
+                clearAllPointClouds();
+                
+                // Dispose geometry and materials to free up memory
+                loadedModel.traverse(function(child) {
+                    if (child.isMesh) {
+                        if (child.geometry) {
+                            child.geometry.dispose();
+                        }
+                        // Add check for child.material before disposing
+                        if (child.material) {
+                            // If material is an array, dispose each one
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(material => {
+                                    if (material) material.dispose(); // Add check here too
+                                });
+                            } else {
+                                if (child.material) child.material.dispose(); // Add check here
+                            }
+                        }
+                    }
+                });
+                loadedModel = null;
+            }
+
+            let objFile = null;
+            let mtlFile = null;
+            let glbFile = null;
+            let stlFile = null;
+            const textureFiles = {}; // Store texture files by name
+
+            // Identify files
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileName = file.name;
+                const fileExtension = fileName.split('.').pop().toLowerCase();
+
+                if (fileExtension === 'obj') {
+                    objFile = file;
+                } else if (fileExtension === 'mtl') {
+                    mtlFile = file;
+                } else if (fileExtension === 'glb') {
+                    glbFile = file;
+                } else if (fileExtension === 'stl') {
+                    stlFile = file;
+                } else {
+                    // Assume other files are textures and store them
+                    textureFiles[fileName] = file;
+                }
+            }
+
+            // Prioritize GLB, then STL, then OBJ
+            if (glbFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    loadGLBFromFile(e.target.result); // GLB is ArrayBuffer
+                };
+                reader.readAsArrayBuffer(glbFile);
+            } else if (stlFile) {
+                 const reader = new FileReader();
+                reader.onload = function(e) {
+                    loadSTLFromFile(e.target.result); // STL is ArrayBuffer
+                };
+                reader.readAsArrayBuffer(stlFile);
+            } else if (objFile) {
+                if (mtlFile) {
+                    // Load MTL first, then OBJ
+                    const mtlReader = new FileReader();
+                    mtlReader.onload = function(mtlEvent) {
+                        const mtlContent = mtlEvent.target.result;
+
+                        const objReader = new FileReader();
+                        objReader.onload = function(objEvent) {
+                            const objContent = objEvent.target.result;
+                            // Pass texture files to loadOBJWithMTL to potentially handle them
+                            loadOBJWithMTL(objContent, mtlContent, textureFiles);
+                        };
+                        objReader.readAsText(objFile);
+                    };
+                    mtlReader.readAsText(mtlFile);
+                } else {
+                    // Load OBJ only
+                    const objReader = new FileReader();
+                    objReader.onload = function(objEvent) {
+                        loadOBJFromFile(objEvent.target.result); // Use existing function
+                    };
+                    objReader.readAsText(objFile);
+                }
+            } else {
+                console.error('No supported model file selected.');
+                document.getElementById('loading').innerHTML = '未选择支持的模型文件 (.obj, .glb, .stl)';
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function loadOBJFromFile(fileContent) {
+            const objLoader = new OBJLoader();
+
+            try {
+                const object = objLoader.parse(fileContent); // OBJLoader can parse text content
+                loadedModel = object;
+
+                // Add default material if needed (like in loadOBJOnly)
+                object.traverse(function(child) {
+                    if (child.isMesh && !child.material) { // Check if material exists
+                        child.material = new THREE.MeshLambertMaterial({
+                            color: 0x888888,
+                            side: THREE.DoubleSide
+                        });
+                    }
+                });
+
+                scene.add(object);
+                fitModelToView(object);
+                document.getElementById('loading').style.display = 'none';
+                
+                // 重置可视化模式为正常模式
+                visualizationMode = 0;
+                updateVisualizationButtons(); // 更新按钮状态
+                console.log('OBJ模型加载成功!');
+            } catch (error) {
+                console.error('OBJ模型加载失败:', error);
+                document.getElementById('loading').innerHTML = 'OBJ模型加载失败';
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function loadOBJWithMTL(objContent, mtlContent, textureFiles) {
+            const mtlLoader = new MTLLoader();
+
+            // Attempt to handle textures by creating a custom texture loader
+            // This is a basic attempt and might not cover all cases or texture types.
+            // A more robust solution would involve a custom LoadingManager.
+            // Note: Loading textures from local files referenced in MTL is complex
+            // and this basic approach might not work for all cases or file structures.
+            mtlLoader.manager.setURLModifier(function(url) {
+                // Check if the requested URL (texture filename) exists in the selected texture files
+                const textureFile = textureFiles[url];
+                if (textureFile) {
+                    // Create a data URL for the texture file
+                    return URL.createObjectURL(textureFile);
+                }
+                return url; // Return original URL if not found in selected files
+            });
+
+
+            const materials = mtlLoader.parse(mtlContent, ''); // Base path is empty as we are parsing content
+
+            const objLoader = new OBJLoader();
+            objLoader.setMaterials(materials);
+
+            try {
+                const object = objLoader.parse(objContent);
+                loadedModel = object;
+                
+                scene.add(object);
+                fitModelToView(object);
+                document.getElementById('loading').style.display = 'none';
+                
+                // 重置可视化模式为正常模式
+                visualizationMode = 0;
+                updateVisualizationButtons(); // 更新按钮状态
+                console.log('OBJ模型加载成功 (包含材质)!');
+            } catch (error) {
+                console.error('OBJ模型加载失败:', error);
+                document.getElementById('loading').innerHTML = 'OBJ模型加载失败';
+                document.getElementById('loading').style.display = 'none';
+            } finally {
+                // Clean up created object URLs after loading
+                for (const fileName in textureFiles) {
+                    URL.revokeObjectURL(textureFiles[fileName]);
+                }
+            }
+        }
+
+
+        function loadSTLFromFile(fileContent) {
+            const loader = new STLLoader();
+            try {
+                const geometry = loader.parse(fileContent); // STLLoader can parse ArrayBuffer
+
+                geometry.computeVertexNormals();
+
+                let material;
+                if (geometry.hasColors) {
+                    material = new THREE.MeshPhongMaterial({
+                        vertexColors: true,
+                        opacity: geometry.alpha !== undefined ? geometry.alpha : 1,
+                        transparent: geometry.alpha !== undefined ? geometry.alpha < 1.0 : false
+                    });
+                } else {
+                    material = new THREE.MeshLambertMaterial({
+                        color: 0x888888,
+                        side: THREE.DoubleSide
+                    });
+                }
+                const mesh = new THREE.Mesh(geometry, material);
+                loadedModel = mesh;
+                scene.add(mesh);
+
+                fitModelToView(mesh);
+                document.getElementById('loading').style.display = 'none';
+                
+                // 重置可视化模式为正常模式
+                visualizationMode = 0;
+                updateVisualizationButtons(); // 更新按钮状态
+            } catch (error) {
+                console.error('STL模型加载失败:', error);
+                document.getElementById('loading').innerHTML = 'STL模型加载失败';
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function loadGLBFromFile(fileContent) {
+            const loader = new GLTFLoader();
+            try {
+                loader.parse(fileContent, '', function(gltf) { // GLTFLoader parses ArrayBuffer
+                    loadedModel = gltf.scene;
+                    scene.add(gltf.scene);
+
+                    fitModelToView(gltf.scene);
+                    document.getElementById('loading').style.display = 'none';
+                    
+                    // 重置可视化模式为正常模式
+                    visualizationMode = 0;
+                    updateVisualizationButtons(); // 更新按钮状态
+                    console.log('GLB模型加载成功!');
+                }, function(error) {
+                     console.error('GLB模型加载失败:', error);
+                     document.getElementById('loading').innerHTML = 'GLB模型加载失败';
+                     document.getElementById('loading').style.display = 'none';
+                });
+            } catch (error) {
+                console.error('GLB模型加载失败:', error);
+                document.getElementById('loading').innerHTML = 'GLB模型加载失败';
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+
+        function fitModelToView(object) {
+            // 计算模型的包围盒
+            const box = new THREE.Box3().setFromObject(object);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+
+            // 将模型居中
+            object.position.x -= center.x;
+            object.position.y -= center.y;
+            object.position.z -= center.z;
+
+            // 调整相机位置以适应模型大小
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+            cameraZ *= 1.5; // 稍微拉远一些，调整系数可以根据需要修改
+
+            // 只在z轴拉远，y轴为0
+            camera.position.set(0, 0, cameraZ);
+            camera.lookAt(0, 0, 0);
+
+            // !!! 调整相机的近裁剪面和远裁剪面 !!!
+            // 根据模型大小设置合适的裁剪面，确保模型在可见范围内
+            camera.near = cameraZ / 100; // 近裁剪面设置为距离的1%
+            camera.far = cameraZ * 100;  // 远裁剪面设置为距离的100倍
+            camera.updateProjectionMatrix(); // 更新投影矩阵
+
+            // 更新控制器
+            controls.target.set(0, 0, 0);
+            controls.maxDistance = cameraZ * 5;
+            controls.update();
+            
+            // 更新坐标轴的大小
+            updateAxesScale(maxDim);
+            
+            // 如果坐标轴当前可见，也要更新显示
+            if (isAxesVisible && axesHelper && scene.children.includes(axesHelper)) {
+                updateAxesForCurrentModel();
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // 全局函数供按钮调用
+        window.resetCamera = function() {
+            if (loadedModel) {
+                fitModelToView(loadedModel);
+            } else {
+                camera.position.set(5, 5, 5);
+                camera.lookAt(0, 0, 0);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            }
+        }
+
+        window.setVisualizationMode = function(mode) {
+            if (!loadedModel) return;
+            
+            visualizationMode = mode;
+            
+            // 更新按钮状态
+            updateVisualizationButtons();
+            
+            // 如果切换到点云模式，只在需要构建时显示加载提示
+            if (mode === 2) {
+                if (!pointCloudsBuilt) {
+                    // 第一次进入点云模式，显示构建提示
+                    document.getElementById('loading').style.display = 'block';
+                    document.getElementById('loading').innerHTML = '正在构建点云...';
+                    
+                    // 使用 setTimeout 让加载提示先显示
+                    setTimeout(() => {
+                        processVisualizationMode();
+                    }, 50);
+                } else {
+                    // 点云已存在，直接切换
+                    processVisualizationMode();
+                }
+            } else {
+                processVisualizationMode();
+            }
+        }
+        
+        // 清理所有点云对象的函数（完全删除，用于加载新模型时）
+        function clearAllPointClouds() {
+            pointClouds.forEach(points => {
+                scene.remove(points);
+                if (points.geometry) points.geometry.dispose();
+                if (points.material) points.material.dispose();
+            });
+            pointClouds = [];
+            pointCloudsBuilt = false;
+            
+            // 清理mesh的pointsHelper引用
+            if (loadedModel) {
+                loadedModel.traverse(function(child) {
+                    if (child.isMesh) {
+                        child.userData.pointsHelper = undefined;
+                    }
+                });
+            }
+        }
+        
+        // 隐藏所有点云对象的函数（保留缓存，用于模式切换时）
+        function hideAllPointClouds() {
+            pointClouds.forEach(points => {
+                points.visible = false;
+            });
+        }
+        
+        // 显示所有点云对象的函数
+        function showAllPointClouds() {
+            pointClouds.forEach(points => {
+                points.visible = true;
+            });
+        }
+        
+        function processVisualizationMode() {
+            if (!loadedModel) return;
+            
+            switch(visualizationMode) {
+                case 0: // 正常模式
+                    hideAllPointClouds(); // 隐藏点云但不删除
+                    showAllMeshes(); // 显示原始模型
+                    setMeshWireframe(false); // 关闭线框
+                    break;
+                    
+                case 1: // 线框模式
+                    hideAllPointClouds(); // 隐藏点云但不删除
+                    showAllMeshes(); // 显示原始模型
+                    setMeshWireframe(true); // 开启线框
+                    break;
+                    
+                case 2: // 点云模式
+                    hideAllMeshes(); // 隐藏原始模型
+                    if (!pointCloudsBuilt) {
+                        // 第一次进入点云模式，需要构建点云
+                        buildPointClouds();
+                    } else {
+                        // 点云已存在，直接显示
+                        showAllPointClouds();
+                    }
+                    break;
+            }
+            
+            // 如果是点云模式，隐藏加载提示
+            if (visualizationMode === 2) {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        // 显示所有mesh
+        function showAllMeshes() {
+            if (!loadedModel) return;
+            loadedModel.traverse(function(child) {
+                if (child.isMesh) {
+                    child.visible = true;
+                }
+            });
+        }
+        
+        // 隐藏所有mesh
+        function hideAllMeshes() {
+            if (!loadedModel) return;
+            loadedModel.traverse(function(child) {
+                if (child.isMesh) {
+                    child.visible = false;
+                }
+            });
+        }
+        
+        // 设置mesh的线框模式
+        function setMeshWireframe(wireframe) {
+            if (!loadedModel) return;
+            loadedModel.traverse(function(child) {
+                if (child.isMesh) {
+                    // 恢复或保存原始材质
+                    if (!child.userData.originalMaterial) {
+                        child.userData.originalMaterial = child.material.clone();
+                    } else if (!wireframe) {
+                        // 如果关闭线框，恢复原始材质
+                        child.material = child.userData.originalMaterial.clone();
+                    }
+                    
+                    child.material.wireframe = wireframe;
+                    if (wireframe) {
+                        child.material.wireframeLinewidth = 1;
+                    }
+                }
+            });
+        }
+        
+        // 构建点云（只在第一次进入点云模式时调用）
+        function buildPointClouds() {
+            // 首先收集所有mesh信息
+            const allMeshes = [];
+            loadedModel.traverse(function(child) {
+                if (child.isMesh) {
+                    allMeshes.push(child);
+                }
+            });
+            
+            // 检查是否为多材质OBJ+MTL模型（每个材质一个独立mesh）
+            const isMultiMaterialOBJ = allMeshes.length > 1 && allMeshes.every(mesh => 
+                !Array.isArray(mesh.material) && mesh.geometry.groups.length <= 1
+            );
+            
+            if (isMultiMaterialOBJ) {
+                // 多材质OBJ+MTL模型：合并所有mesh的几何体，创建单一点云
+                
+                const combinedPositions = [];
+                const combinedColors = [];
+                let totalVertexCount = 0;
+                
+                // 合并所有子mesh的几何体
+                allMeshes.forEach((child, meshIndex) => {
+                    const geometry = child.geometry;
+                    const positions = geometry.attributes.position;
+                    const material = child.material;
+                    
+                    // 确定这个mesh的颜色
+                    let meshColor = [0.533, 0.533, 0.533]; // 默认灰色
+                    if (material && material.color)
+                        meshColor = [material.color.r, material.color.g, material.color.b];
+                    
+                    // 将所有顶点位置转换到世界坐标
+                    for (let i = 0; i < positions.count; i++) {
+                        const localPos = new THREE.Vector3(positions.getX(i), positions.getY(i), positions.getZ(i));
+                        
+                        // 应用mesh的变换矩阵转换到世界坐标
+                        child.updateMatrixWorld();
+                        localPos.applyMatrix4(child.matrixWorld);
+                        
+                        combinedPositions.push(localPos.x, localPos.y, localPos.z);
+                        combinedColors.push(meshColor[0], meshColor[1], meshColor[2]);
+                    }
+                    
+                    totalVertexCount += positions.count;
+                });
+                
+                // 创建合并后的几何体
+                const combinedGeometry = new THREE.BufferGeometry();
+                combinedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(combinedPositions, 3));
+                combinedGeometry.setAttribute('color', new THREE.Float32BufferAttribute(combinedColors, 3));
+                
+                // 处理重叠顶点（现在会正确处理不同颜色的重叠顶点）
+                const processedGeometry = handleOverlappingVertices(combinedGeometry);
+                
+                // 创建单一的点云材质
+                const pointsMaterial = new THREE.PointsMaterial({
+                    size: 0.18,
+                    sizeAttenuation: true,
+                    vertexColors: true,
+                    transparent: false,
+                    fog: false,
+                    toneMapped: false
+                });
+                
+                // 创建点云对象
+                const points = new THREE.Points(processedGeometry, pointsMaterial);
+
+                // 添加到场景和管理数组
+                scene.add(points);
+                pointClouds.push(points);
+                
+                // 为所有原始mesh添加引用
+                allMeshes.forEach(child => {
+                    child.userData.pointsHelper = points;
+                });
+            } else {
+                // 单个mesh或非OBJ+MTL的情况
+                loadedModel.traverse(function(child) {
+                    if (child.isMesh) {
+                        let pointsMaterial;
+                        
+                        // 检查是否有顶点颜色
+                        if (child.geometry.hasAttribute('color')) {
+                            pointsMaterial = new THREE.PointsMaterial({
+                                size: 0.18,
+                                sizeAttenuation: true,
+                                vertexColors: true,
+                                transparent: false,
+                                fog: false,
+                                toneMapped: false
+                            });
+                        } else {
+                            let pointColor = 0x888888;
+                            if (child.material.color) {
+                                pointColor = child.material.color.getHex();
+                            }
+                            
+                            pointsMaterial = new THREE.PointsMaterial({
+                                color: pointColor,
+                                size: 0.18,
+                                sizeAttenuation: true,
+                                vertexColors: false,
+                                transparent: false,
+                                fog: false,
+                                toneMapped: false
+                            });
+                        }
+                        
+                        // 处理重叠顶点问题
+                        const processedGeometry = handleOverlappingVertices(child.geometry);
+                        
+                        // 创建点云对象
+                        const points = new THREE.Points(processedGeometry, pointsMaterial);
+                        
+                        // 复制原始mesh的变换矩阵
+                        points.position.copy(child.position);
+                        points.rotation.copy(child.rotation);
+                        points.scale.copy(child.scale);
+                        points.matrix.copy(child.matrix);
+                        points.matrixWorld.copy(child.matrixWorld);
+                        
+                        // 保存原始mesh引用
+                        points.userData.originalMesh = child;
+                        
+                        // 添加到场景和管理数组
+                        scene.add(points);
+                        pointClouds.push(points);
+                        child.userData.pointsHelper = points;
+                    }
+                });
+            }
+            
+            pointCloudsBuilt = true;
+        }
+
+        // 更新可视化模式按钮状态
+        function updateVisualizationButtons() {
+            const buttons = [
+                document.getElementById('normalMode'),
+                document.getElementById('wireframeMode'),
+                document.getElementById('pointCloudMode')
+            ];
+            
+            buttons.forEach((button, index) => {
+                if (button) {
+                    if (index === visualizationMode) {
+                        button.style.backgroundColor = '#4CAF50'; // 绿色表示当前模式
+                        button.style.color = 'white';
+                    } else {
+                        button.style.backgroundColor = '#333';
+                        button.style.color = 'white';
+                    }
+                }
+            });
+        }
+
+        // 添加信息查询模式切换按钮
+        window.toggleInfoMode = function() {
+            isInfoMode = !isInfoMode;
+            const button = document.querySelector('button[onclick="toggleInfoMode()"]');
+            const infoPanel = document.getElementById('pointInfo');
+            
+            if (button) {
+                button.textContent = isInfoMode ? '退出查询模式' : '点云查询';
+                button.style.backgroundColor = isInfoMode ? '#ff6b6b' : '#333';
+            }
+            
+            // 更改鼠标样式
+            renderer.domElement.style.cursor = isInfoMode ? 'crosshair' : 'default';
+            
+            if (isInfoMode) {
+                // 进入查询模式：显示面板
+                if (infoPanel) {
+                    infoPanel.style.display = 'block';
+                    infoPanel.innerHTML = `
+                        <strong>点云信息面板</strong><br>
+                        先进入点云模式，再点击点云查询坐标和颜色信息
+                    `;
+                }
+            } else {
+                // 退出查询模式：隐藏面板和高亮点
+                if (infoPanel) {
+                    infoPanel.style.display = 'none';
+                }
+                if (highlightPoint) {
+                    scene.remove(highlightPoint);
+                    highlightPoint = null;
+                }
+            }
+        };
+        
+        // 坐标轴相关函数
+        window.toggleAxesHelper = function() {
+            isAxesVisible = !isAxesVisible;
+            const button = document.getElementById('axesButton');
+            
+            if (isAxesVisible) {
+                if (!axesHelper)
+                    createAxesHelper();
+                else // 如果坐标轴已存在，更新其大小以匹配当前模型
+                    updateAxesForCurrentModel();
+                scene.add(axesHelper);
+                button.textContent = '隐藏坐标轴';
+                button.style.backgroundColor = '#4CAF50';
+            } else {
+                if (axesHelper) {
+                    scene.remove(axesHelper);
+                }
+                button.textContent = '显示坐标轴';
+                button.style.backgroundColor = '#333';
+            }
+        };
+        
+        function createAxesHelper() {
+            // 创建坐标轴组
+            axesHelper = new THREE.Group();
+            
+            // 获取模型尺寸来确定坐标轴长度
+            let axisLength = 1;
+            if (loadedModel) {
+                const box = new THREE.Box3().setFromObject(loadedModel);
+                const size = box.getSize(new THREE.Vector3());
+                axisLength = Math.max(size.x, size.y, size.z) * 0.15; // 坐标轴长度为模型最大尺寸的15%
+            }
+            
+            // 创建X轴 (红色) - 设置始终在前面显示
+            const xGeometry = new THREE.CylinderGeometry(axisLength * 0.01, axisLength * 0.01, axisLength, 8);
+            const xMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xff0000,
+                depthTest: false,  // 禁用深度测试，使其始终显示在前面
+                depthWrite: false, // 禁用深度写入
+                transparent: true,
+                opacity: 0.6       // 稍微透明，避免完全遮挡模型
+            });
+            const xAxis = new THREE.Mesh(xGeometry, xMaterial);
+            xAxis.rotation.z = -Math.PI / 2;
+            xAxis.position.x = axisLength / 2;
+            xAxis.renderOrder = 999; // 设置高渲染优先级
+            // X轴箭头
+            const xArrowGeometry = new THREE.ConeGeometry(axisLength * 0.03, axisLength * 0.1, 8);
+            const xArrow = new THREE.Mesh(xArrowGeometry, xMaterial);
+            xArrow.rotation.z = -Math.PI / 2;
+            xArrow.position.x = axisLength + axisLength * 0.05;
+            xArrow.renderOrder = 999;
+            
+            // 创建Y轴 (绿色) - 设置始终在前面显示
+            const yGeometry = new THREE.CylinderGeometry(axisLength * 0.01, axisLength * 0.01, axisLength, 8);
+            const yMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x00ff00,
+                depthTest: false,
+                depthWrite: false,
+                transparent: true,
+                opacity: 0.6
+            });
+            const yAxis = new THREE.Mesh(yGeometry, yMaterial);
+            yAxis.position.y = axisLength / 2;
+            yAxis.renderOrder = 999;
+            // Y轴箭头
+            const yArrowGeometry = new THREE.ConeGeometry(axisLength * 0.03, axisLength * 0.1, 8);
+            const yArrow = new THREE.Mesh(yArrowGeometry, yMaterial);
+            yArrow.position.y = axisLength + axisLength * 0.05;
+            yArrow.renderOrder = 999;
+            
+            // 创建Z轴 (蓝色) - 设置始终在前面显示
+            const zGeometry = new THREE.CylinderGeometry(axisLength * 0.01, axisLength * 0.01, axisLength, 8);
+            const zMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x0000ff,
+                depthTest: false,
+                depthWrite: false,
+                transparent: true,
+                opacity: 0.6
+            });
+            const zAxis = new THREE.Mesh(zGeometry, zMaterial);
+            zAxis.rotation.x = Math.PI / 2;
+            zAxis.position.z = axisLength / 2;
+            zAxis.renderOrder = 999;
+            // Z轴箭头
+            const zArrowGeometry = new THREE.ConeGeometry(axisLength * 0.03, axisLength * 0.1, 8);
+            const zArrow = new THREE.Mesh(zArrowGeometry, zMaterial);
+            zArrow.rotation.x = Math.PI / 2;
+            zArrow.position.z = axisLength + axisLength * 0.05;
+            zArrow.renderOrder = 999;
+            
+            // 添加所有轴到组中
+            axesHelper.add(xAxis);
+            axesHelper.add(xArrow);
+            axesHelper.add(yAxis);
+            axesHelper.add(yArrow);
+            axesHelper.add(zAxis);
+            axesHelper.add(zArrow);
+            
+            // 存储原始长度用于缩放
+            axesHelper.userData.originalLength = axisLength;
+        }
+        
+        function updateAxesScale(modelMaxDim) {
+            if (!axesHelper) return;
+            
+            // 根据模型大小动态调整坐标轴的缩放
+            const newAxisLength = modelMaxDim * 0.15; // 坐标轴长度为模型最大尺寸的15%
+            const scale = newAxisLength / axesHelper.userData.originalLength;
+            
+            axesHelper.scale.setScalar(scale);
+        }
+        
+        // 为当前模型更新坐标轴
+        function updateAxesForCurrentModel() {
+            if (!loadedModel || !axesHelper) return;
+            
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            
+            updateAxesScale(maxDim);
+        }
+    </script>
+</body>
+</html>

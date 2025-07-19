@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Babylon.js OBJ Local Loader (Async/AssetContainer)</title>
+    <!-- Babylon.js libraries -->
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <style>
+        html, body { overflow: hidden; width: 100%; height: 100%; margin: 0; padding: 0; }
+        #renderCanvas { width: 100%; height: 100%; touch-action: none; }
+        #fileInput { position: absolute; top: 10px; left: 10px; z-index: 10; }
+    </style>
+</head>
+<body>
+    <!-- User selects all required files here: .obj, .mtl, and texture(s) -->
+    <input type="file" id="fileInput" multiple accept=".obj,.mtl,.png,.jpg.jpeg,.gif,.bmp,.webp" />
+    <canvas id="renderCanvas"></canvas>
+
+    <script>
+        // --- 1. Basic Babylon.js Setup ---
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+
+        const createScene = () => {
+            const scene = new BABYLON.Scene(engine);
+            scene.createDefaultCameraOrLight(true, true, true);
+            scene.useRightHandedSystem = true;
+            const camera = scene.activeCamera;
+            camera.alpha += Math.PI; // Pan camera to face the front of the model
+            camera.wheelDeltaPercentage = 0.01;
+            // Clear any previously loaded models by disposing existing meshes (except camera/light)
+            scene.onNewMessage = (message, sender, details) => {
+                if (message === "New meshes loaded") {
+                    // Dispose old meshes if you want to replace the model on each load
+                    const meshesToDispose = scene.meshes.filter(m => !(m instanceof BABYLON.Light) && !(m instanceof BABYLON.Camera));
+                    meshesToDispose.forEach(m => m.dispose());
+                }
+            };
+            return scene;
+        };
+
+        let scene = createScene(); // Use let to allow re-creation if needed
+
+        // --- 2. Core Logic: File Processing and Loading ---
+
+        const fileInput = document.getElementById("fileInput");
+        fileInput.addEventListener("change", (event) => {
+            const files = event.target.files;
+            if (files && files.length > 0) {
+                // Optional: Clear previous model before loading a new one
+                // Dispose all meshes except camera and lights
+                scene.meshes.forEach(mesh => {
+                    if (!(mesh instanceof BABYLON.Camera) && !(mesh instanceof BABYLON.HemisphericLight)) {
+                        mesh.dispose();
+                    }
+                });
+                // Dispose old materials as well
+                 scene.materials.forEach(material => material.dispose());
+                
+                processAndLoadFiles(files);
+            }
+        });
+
+        /**
+         * Processes user-selected files to load an OBJ model with its material and texture.
+         * This approach uses LoadAssetContainerAsync for modern, promise-based loading.
+         * @param {FileList} files - The files selected by the user.
+         */
+        const processAndLoadFiles = async (files) => {
+            const fileMap = {};
+            for (const file of files) {
+                fileMap[file.name] = file;
+            }
+
+            const objFileName = Object.keys(fileMap).find(name => name.toLowerCase().endsWith(".obj"));
+            const mtlFileName = Object.keys(fileMap).find(name => name.toLowerCase().endsWith(".mtl"));
+            
+            const supportedImageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"];
+            const textureFileName = Object.keys(fileMap).find(name =>
+                supportedImageExtensions.some(ext => name.toLowerCase().endsWith(ext))
+            );
+
+            if (!objFileName || !mtlFileName || !textureFileName) {
+                alert("Error: Please select one .obj, one .mtl, and at least one texture file.");
+                return;
+            }
+
+            console.log("Selected files:", {
+                obj: objFileName,
+                mtl: mtlFileName,
+                texture: textureFileName
+            });
+
+            // --- The Core "In-Memory" Loading Strategy ---
+
+            let objContent = await readFileAsText(fileMap[objFileName]);
+            let mtlContent = await readFileAsText(fileMap[mtlFileName]);
+            const textureBase64 = await fileToDataURL(fileMap[textureFileName]);
+            
+            objContent = zDownToZIn(objContent);
+
+            mtlContent = mtlContent.replace(/map_Kd\s+[^\s]+/, `map_Kd ${textureBase64}`);
+            
+            // --- 3. Load assets using LoadAssetContainerAsync ---
+
+            try {
+                // Load the geometry from the OBJ string into an AssetContainer.
+                // The container holds the assets but doesn't add them to the scene yet.
+                const assetContainer = await BABYLON.SceneLoader.LoadAssetContainerAsync(
+                    "", // rootUrl is empty as we are providing data directly
+                    "data:" + objContent, // The OBJ content as a data string
+                    scene, // The scene to load the assets into
+                    null, // onProgress callback (optional)
+                    ".obj" // Specify the plugin to use
+                ).then(async container => {
+                    const validMeshes = container.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0);
+                    if (validMeshes.length > 0) {
+                        if (mtlFileName && textureFileName) {
+                            try {
+                                let mtlContent = await readFileAsText(fileMap[mtlFileName]);
+                                const textureBase64 = await fileToDataURL(fileMap[textureFileName]);
+
+                                mtlContent = mtlContent.replace(/map_Kd\s+[^\s]+/g, `map_Kd ${textureBase64}`);
+
+                                const mtlLoader = new BABYLON.MTLFileLoader();
+                                mtlLoader.parseMTL(scene, mtlContent, "");
+
+                                if (scene.materials.length > 0) {
+                                    const newMaterial = scene.materials[scene.materials.length - 1];
+                                    console.log("Using material:", newMaterial.name);
+                                    for (const mesh of validMeshes){
+                                        mesh.material = newMaterial;
+                                        mesh.material.backFaceCulling = false;
+                                    }
+                                }
+                            } catch (e) {
+                                console.error(e);
+                            }
+                        }
+                        try {
+                            const mesh = BABYLON.Mesh.MergeMeshes(validMeshes, true, true, undefined, false, true);
+                            mesh.name = objFileName.replace(".obj", "");
+                            // Add the merged mesh to the scene
+                            scene.addMesh(mesh);
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }
+                });
+
+                console.log("Model loaded successfully using AssetContainer!");
+
+            } catch (error) {
+                console.error("Error loading model:", error);
+                alert("An error occurred while loading the model. Check the console for details.");
+            }
+        };
+
+
+        // --- 4. Helper Functions ---
+
+        const readFileAsText = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => resolve(event.target.result);
+                reader.onerror = (error) => reject(error);
+                reader.readAsText(file);
+            });
+        };
+
+        const fileToDataURL = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => resolve(event.target.result);
+                reader.onerror = (error) => reject(error);
+                reader.readAsDataURL(file);
+            });
+        };
+        
+        function zDownToZIn(objFileContent) {
+            const lines = objFileContent.split("\n");
+            const transformedLines = lines.map(line => {
+                if (line.startsWith("v ")) {
+                    const parts = line.split(" ");
+                    const x = parts[1]; const y = parts[2]; const z = parts[3];
+                    return `v ${x} ${-z} ${y}`;
+                }
+                return line;
+            });
+            return transformedLines.join("\n");
+        }
+
+
+        // --- 5. Start the Engine ---
+        engine.runRenderLoop(() => {
+            if (scene) {
+                scene.render();
+            }
+        });
+
+        window.addEventListener("resize", () => {
+            engine.resize();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RgbQuant.js Interactive Example</title>
+    <style>
+        body { font-family: sans-serif; display: flex; gap: 30px; }
+        main { flex-grow: 1; }
+        aside { width: 350px; flex-shrink: 0; }
+        canvas { border: 1px solid #ccc; max-width: 100%; height: auto; }
+        h3 { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-top: 10px;}
+        .image-container { display: flex; flex-wrap: wrap; gap: 20px; }
+        .config-box { background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; }
+        .config-box h3 { margin-top: 0; }
+        .form-group { margin-bottom: 5px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; cursor: help; }
+        .form-group input[type="number"], .form-group select { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; }
+        .form-group .two-inputs { display: flex; gap: 10px; }
+        .form-group input[type="checkbox"] { margin-right: 5px; }
+        .hidden { display: none; }
+        button { width: 100%; padding: 12px; font-size: 16px; font-weight: bold; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+        button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>RgbQuant.js Interactive Example</h1>
+        <p>在右侧的控制面板中调整参数，然后点击“应用设置”来查看效果。</p>
+        
+        <div class="image-container">
+            <div>
+                <h3>Original Image</h3>
+                <canvas id="canvas-original"></canvas>
+            </div>
+            <div>
+                <h3 id="reduced-title">Reduced Image</h3>
+                <canvas id="canvas-reduced"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <aside>
+        <div class="config-box">
+            <h3>配置面板</h3>
+            <div class="form-group">
+                <label for="opt-colors" title="期望生成的调色板大小，即最终输出的颜色数量。">颜色数量 (colors)</label>
+                <input type="number" id="opt-colors" value="128" min="2" max="256">
+            </div>
+            <div class="form-group">
+                <label for="opt-method" title="选择生成直方图的方法。方法2（默认）使用子区域像素数阈值，方法1使用全局最高频颜色。">量化方法 (method)</label>
+                <select id="opt-method">
+                    <option value="2">子区域阈值 (2)</option>
+                    <option value="1">全局最高频 (1)</option>
+                </select>
+            </div>
+            <!-- Method 1 Options -->
+            <div id="method-1-opts" class="hidden">
+                <div class="form-group">
+                    <label for="opt-initColors" title="[仅方法1] 从最高频颜色中选取多少种作为初始颜色进行后续处理。">初始颜色数 (initColors)</label>
+                    <input type="number" id="opt-initColors" value="4096">
+                </div>
+            </div>
+            <!-- Method 2 Options -->
+            <div id="method-2-opts">
+                <div class="form-group">
+                    <label for="opt-boxSizeW" title="[仅方法2] 定义子区域的尺寸（宽度和高度）。">子区域尺寸 (boxSize)</label>
+                    <div class="two-inputs">
+                        <input type="number" id="opt-boxSizeW" value="64" placeholder="Width">
+                        <input type="number" id="opt-boxSizeH" value="64" placeholder="Height">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="opt-boxPxls" title="[仅方法2] 在一个子区域内，一个颜色至少需要出现多少次才会被计入直方图。">子区域最小像素数 (boxPxls)</label>
+                    <input type="number" id="opt-boxPxls" value="2">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="opt-minHueCols" title="为每个色相组保留的最小颜色数，无论其出现频率如何。用于保留低频但重要的颜色。">最小色相颜色数 (minHueCols)</label>
+                <input type="number" id="opt-minHueCols" value="0">
+            </div>
+            <div class="form-group">
+                <label for="opt-dithKern" title="选择抖动算法来模拟更多颜色，使渐变看起来更平滑。选择 'None' 则禁用抖动。">抖动算法 (dithKern)</label>
+                <select id="opt-dithKern">
+                    <option value="null" selected>None</option>
+                    <option value="FloydSteinberg">FloydSteinberg</option>
+                    <option value="FalseFloydSteinberg">FalseFloydSteinberg</option>
+                    <option value="Stucki">Stucki</option>
+                    <option value="Atkinson">Atkinson</option>
+                    <option value="Jarvis">Jarvis</option>
+                    <option value="Burkes">Burkes</option>
+                    <option value="Sierra">Sierra</option>
+                    <option value="TwoSierra">TwoSierra</option>
+                    <option value="SierraLite">SierraLite</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="opt-dithDelta" title="抖动阈值 (0-1)。例如：0.05 表示颜色差异小于5%的将不进行抖动。">抖动阈值 (dithDelta)</label>
+                <input type="number" id="opt-dithDelta" value="0" step="0.01" min="0" max="1">
+            </div>
+            <div class="form-group">
+                <label title="启用蛇形抖动模式。">
+                    <input type="checkbox" id="opt-dithSerp">
+                    蛇形抖动 (dithSerp)
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="opt-colorDist" title="用于确定颜色相似度的计算方法。">颜色距离公式 (colorDist)</label>
+                <select id="opt-colorDist">
+                    <option value="euclidean">Euclidean (欧几里得)</option>
+                    <option value="manhattan">Manhattan (曼哈顿)</option>
+                </select>
+            </div>
+             <div class="form-group">
+                <label title="启用颜色缓存以提高性能。在某些情况下（如使用预定义调色板）可能会降低性能。">
+                    <input type="checkbox" id="opt-useCache" checked>
+                    启用缓存 (useCache)
+                </label>
+            </div>
+            <div id="cache-opts">
+                <div class="form-group">
+                    <label for="opt-cacheFreq" title="[仅当启用缓存时] 一种颜色出现次数达到多少才有资格被缓存。">缓存频率阈值 (cacheFreq)</label>
+                    <input type="number" id="opt-cacheFreq" value="10">
+                </div>
+            </div>
+            <button id="btn-apply">应用设置</button>
+        </div>
+    </aside>
+
+    <script type="module">
+        import { RgbQuant } from './rgbquant.esm.js';
+
+        // --- DOM Elements ---
+        const canvasOriginal = document.getElementById('canvas-original');
+        const ctxOriginal = canvasOriginal.getContext('2d');
+        const canvasReduced = document.getElementById('canvas-reduced');
+        const ctxReduced = canvasReduced.getContext('2d');
+        const reducedTitle = document.getElementById('reduced-title');
+        const applyButton = document.getElementById('btn-apply');
+        const methodSelect = document.getElementById('opt-method');
+        const useCacheCheck = document.getElementById('opt-useCache');
+
+        // --- Image to Process ---
+        const imageUrl = './pnggrad8rgb.png';
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+
+        /**
+         * Toggles the visibility of options based on the selected method.
+         */
+        function updateOptionVisibility() {
+            const method = methodSelect.value;
+            document.getElementById('method-1-opts').classList.toggle('hidden', method !== '1');
+            document.getElementById('method-2-opts').classList.toggle('hidden', method !== '2');
+            
+            const useCache = useCacheCheck.checked;
+            document.getElementById('cache-opts').classList.toggle('hidden', !useCache);
+        }
+
+        /**
+         * Reads the current configuration from the UI controls.
+         */
+        function getOptionsFromUI() {
+            const opts = {
+                colors: parseInt(document.getElementById('opt-colors').value, 10),
+                method: parseInt(methodSelect.value, 10),
+                minHueCols: parseInt(document.getElementById('opt-minHueCols').value, 10),
+                dithDelta: parseFloat(document.getElementById('opt-dithDelta').value),
+                dithSerp: document.getElementById('opt-dithSerp').checked,
+                colorDist: document.getElementById('opt-colorDist').value,
+                useCache: useCacheCheck.checked,
+            };
+
+            let dithKern = document.getElementById('opt-dithKern').value;
+            opts.dithKern = (dithKern === 'null') ? null : dithKern;
+
+            if (opts.method === 1) {
+                opts.initColors = parseInt(document.getElementById('opt-initColors').value, 10);
+            }
+            if (opts.method === 2) {
+                const boxW = parseInt(document.getElementById('opt-boxSizeW').value, 10);
+                const boxH = parseInt(document.getElementById('opt-boxSizeH').value, 10);
+                opts.boxSize = [boxW, boxH];
+                opts.boxPxls = parseInt(document.getElementById('opt-boxPxls').value, 10);
+            }
+            if (opts.useCache) {
+                opts.cacheFreq = parseInt(document.getElementById('opt-cacheFreq').value, 10);
+            }
+
+            return opts;
+        }
+
+        /**
+         * Processes the image with the given options and updates the canvas.
+         */
+        function processImage() {
+            const opts = getOptionsFromUI();
+            console.log('Processing with options:', opts);
+
+            reducedTitle.textContent = `Reduced Image (${opts.colors} Colors)`;
+
+            const quant = new RgbQuant(opts);
+            quant.sample(img);
+            const reducedPixelData = quant.reduce(img);
+
+            const reducedImageData = ctxReduced.createImageData(img.naturalWidth, img.naturalHeight);
+            reducedImageData.data.set(reducedPixelData);
+            
+            canvasReduced.width = img.naturalWidth;
+            canvasReduced.height = img.naturalHeight;
+            ctxReduced.putImageData(reducedImageData, 0, 0);
+            console.log('Reduced image updated.');
+        }
+
+        // --- Event Listeners ---
+        img.onload = () => {
+            canvasOriginal.width = img.naturalWidth;
+            canvasOriginal.height = img.naturalHeight;
+            ctxOriginal.drawImage(img, 0, 0);
+            console.log('Original image drawn.');
+            
+            updateOptionVisibility();
+            processImage();
+        };
+
+        img.onerror = () => {
+            console.error('Failed to load image. If you are running this from a local file, you may be running into CORS issues.');
+            alert('Failed to load image. Please try running this from a local web server.');
+        }
+
+        applyButton.addEventListener('click', processImage);
+        methodSelect.addEventListener('change', updateOptionVisibility);
+        useCacheCheck.addEventListener('change', updateOptionVisibility);
+
+        // --- Initial Load ---
+        console.log(`Loading image: ${imageUrl}`);
+        img.src = imageUrl;
+    </script>
+</body>
+</html>
